@@ -41,7 +41,7 @@ class LogisticRegressionOptimizer(Optimizer):
                 # compute partial grad first:
                 col = Variable(torch.FloatTensor(dataset.fetch_col(i)))
 
-                mul_arr = self._gradient_kl(col, y)
+                mul_arr = self._gradient_kl(col, y, h)
 
                 f_partial = torch.sum(mul_arr)
                 _prev_model = self._model[i].clone()
@@ -57,9 +57,8 @@ class LogisticRegressionOptimizer(Optimizer):
             logger.info("Current Step: {}, Loss Value: {}".format(self.step, F.data.numpy()[0]))
             self.step += 1
 
-    def _gradient_kl(self, y, col):
-        return -y / (1 + torch.exp(col * y)) * col
+    def _gradient_kl(self, y, col, h):
+        return -y / (1 + torch.exp(h * y)) * col
 
     def _loss_kl(self, y, h):
         return torch.log(1 + torch.exp(-y * h))
-
