@@ -20,11 +20,13 @@ class Optimizer(object):
         raise NotImplementedError()
 
 class SCDOptimizer(Optimizer):
-    def __init__(self, lr, enable_gpu):
+    def __init__(self, **args):
         super(SCDOptimizer, self).__init__()
-        self.lr = lr
+        self.lr = args['lr']
         self.step = 0
-        self._enable_gpu = enable_gpu
+
+        self._enable_gpu = args['enable_gpu']
+        self._max_steps = args['max_steps']
 
     def _build_model(self, dim):
         if self._enable_gpu:
@@ -35,9 +37,11 @@ class SCDOptimizer(Optimizer):
     def minimize(self, dataset):
         self._build_model(dataset.num_features)
         if self._enable_gpu:
+            gpu_copy_base_start = time.time()
             y = Variable(torch.FloatTensor(dataset.labels)).cuda()
             h = Variable(torch.FloatTensor(dataset.num_tuples).zero_()).cuda()
             f_cur = Variable(torch.FloatTensor(dataset.num_tuples).zero_()).cuda()
+            gpu_copy_base_duration = time.time()-gpu_copy_base_start
         else:
             y = Variable(torch.FloatTensor(dataset.labels))
             h = Variable(torch.FloatTensor(dataset.num_tuples).zero_())
@@ -46,33 +50,47 @@ class SCDOptimizer(Optimizer):
         r_prev = 0
         F = 0
         # iterative process
-        while self.step <= 100000:
+        while self.step <= self._max_steps:
             iter_start = time.time()
             for i in range(dataset.num_features):
                 # compute partial grad first:
                 if self._enable_gpu:
+                    gpu_iter_copy_start = time.time()
                     col = Variable(torch.FloatTensor(dataset.fetch_col(i))).cuda()
+                    gpu_copy_duration = time.time()-gpu_iter_copy_start+gpu_copy_base_duration
                 else:
                     col = Variable(torch.FloatTensor(dataset.fetch_col(i)))
+                    gpu_copy_duration = 0
 
+                grad_comp_start = time.time()
                 mul_arr = self._gradient_kl(col, y, h)
-
                 f_partial = torch.sum(mul_arr)
                 _prev_model = self._model[i].clone()
-                # model partial update  
+                grad_comp_duration = time.time() - grad_comp_start
+
+                # model partial update
+                model_update_start = time.time() 
                 self._model[i] = self._model[i] - self.lr * f_partial
                 model_diff = self._model[i] - _prev_model
+                model_update_duration = time.time() - model_update_start
+                
                 # back_kl
+                backkl_start = time.time()
                 h = h + model_diff * col
+                backkl_duration = time.time() - backkl_start
 
+            loss_comp_start = time.time()
             f_cur = self._loss_kl(y, h)
             r_curr = F
             F = torch.sum(f_cur)
+            loss_comp_duration = time.time() - loss_comp_start
             if self._enable_gpu:
                 _loss_val = F.cpu().data.numpy()[0]
             else:
                 _loss_val = F.data.numpy()[0]
-            logger.info("Current Step: {}, Loss Value: {}, Duration Iteration: {}".format(self.step, _loss_val, time.time()-iter_start))
+            logger_format = "Step: {}, Loss: {:.4f}, Iteration Cost: {:.4f}, GPU Copy: {:.4f}, Grad Comp: {:.4f}, Model Update: {:.4f}, Backkl: {:.4f}, Loss Comp: {:.4f}"
+            logger.info(logger_format.format(self.step, _loss_val, time.time()-iter_start, gpu_copy_duration, 
+                                            grad_comp_duration, model_update_duration, backkl_duration, loss_comp_duration))
             self.step += 1
 
     def _gradient_kl(self, y, col, h):
