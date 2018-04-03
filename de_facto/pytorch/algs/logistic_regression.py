@@ -1,6 +1,7 @@
 import torch
 from torch.autograd import Variable
 
+import time
 import copy
 import logging
 
@@ -46,6 +47,7 @@ class SCDOptimizer(Optimizer):
         F = 0
         # iterative process
         while self.step <= 100000:
+            iter_start = time.time()
             for i in range(dataset.num_features):
                 # compute partial grad first:
                 if self._enable_gpu:
@@ -66,7 +68,11 @@ class SCDOptimizer(Optimizer):
             f_cur = self._loss_kl(y, h)
             r_curr = F
             F = torch.sum(f_cur)
-            logger.info("Current Step: {}, Loss Value: {}".format(self.step, F.data.numpy()[0]))
+            if self._enable_gpu:
+                _loss_val = F.cpu().data.numpy()[0]
+            else:
+                _loss_val = F.data.numpy()[0]
+            logger.info("Current Step: {}, Loss Value: {}, Duration Iteration: {}".format(self.step, _loss_val, time.time()-iter_start))
             self.step += 1
 
     def _gradient_kl(self, y, col, h):
