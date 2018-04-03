@@ -35,6 +35,14 @@ class Dataset(object):
     def fetch_col(self, col_index):
         return self._training_data[:, col_index]
 
+    def shuffle(self, seed=None):
+        if seed:
+            np.random.seed(seed=seed)
+        shuffled_indices = np.arange(_NUM_TUPLES)
+        np.random.shuffle(shuffled_indices)
+        self._training_data = np.take(self._training_data, shuffled_indices, axis=0)
+        self._training_labels = np.take(self._training_labels, shuffled_indices)
+
     @property
     def num_tuples(self):
         return self._m
@@ -47,9 +55,17 @@ class Dataset(object):
     def labels(self):
         return self._training_labels
 
+    @property
+    def data_table(self):
+        return self._training_data
+
 
 if __name__ == "__main__":
     data = load_data("T_float")
     dataset = Dataset(data)
     print('Training set shape: {}'.format((dataset.num_tuples,dataset.num_features)))
     print('Training label shape: {}'.format(dataset.num_tuples))
+    dataset.shuffle(seed=12)
+    print(dataset.data_table)
+    print("---------------------------------------------------")
+    print(dataset.labels)
