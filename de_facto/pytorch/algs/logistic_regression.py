@@ -57,7 +57,7 @@ class SCDOptimizer(Optimizer):
         r_prev = 0
         F = 0
         # iterative process
-        while self.step <= self._max_steps:
+        while self.step < self._max_steps:
             iter_start = time.time()
             for i in range(dataset.num_features):
                 # compute partial grad first:
@@ -71,7 +71,7 @@ class SCDOptimizer(Optimizer):
 
                 grad_comp_start = time.time()
                 mul_arr = self._gradient_kl(y, col, h)
-                f_partial = torch.sum(mul_arr)
+                f_partial = torch.sum(mul_arr)/dataset.num_tuples
                 _prev_model = self._model[i].clone()
                 grad_comp_duration = time.time() - grad_comp_start
 
@@ -83,11 +83,13 @@ class SCDOptimizer(Optimizer):
                 
                 # back_kl
                 backkl_start = time.time()
+                # print(h)
                 h = h + model_diff * col
                 backkl_duration = time.time() - backkl_start
 
             loss_comp_start = time.time()
-            f_cur = self._loss_kl(y, h)
+            f_cur = self._loss_kl(y, h)/dataset.num_tuples
+            # print(h)
             r_curr = F
             F = torch.sum(f_cur)
             loss_comp_duration = time.time() - loss_comp_start
