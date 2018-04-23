@@ -5,6 +5,8 @@ import time
 import copy
 import logging
 
+from .utils import warn
+
 logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -27,6 +29,8 @@ class SCDOptimizer(Optimizer):
 
         self._enable_gpu = args['enable_gpu']
         self._max_steps = args['max_steps']
+        self._load_memory = args['load_memory']
+        self._gpu_memory_sanity_check()
 
     def _build_model(self, dim):
         if self._enable_gpu:
@@ -36,6 +40,7 @@ class SCDOptimizer(Optimizer):
 
     def minimize(self, dataset):
         self._build_model(dataset.num_features)
+
         if self._enable_gpu:
             gpu_copy_base_start = time.time()
             y = Variable(torch.FloatTensor(dataset.labels)).cuda()
@@ -56,14 +61,14 @@ class SCDOptimizer(Optimizer):
                 # compute partial grad first:
                 if self._enable_gpu:
                     gpu_iter_copy_start = time.time()
-                    col = Variable(torch.FloatTensor(dataset.fetch_col(i))).cuda()
+                    col = self.fetch_col(i)
                     gpu_copy_duration = time.time()-gpu_iter_copy_start+gpu_copy_base_duration
                 else:
                     col = Variable(torch.FloatTensor(dataset.fetch_col(i)))
                     gpu_copy_duration = 0
 
                 grad_comp_start = time.time()
-                mul_arr = self._gradient_kl(col, y, h)
+                mul_arr = self._gradient_kl(y, col, h)
                 f_partial = torch.sum(mul_arr)
                 _prev_model = self._model[i].clone()
                 grad_comp_duration = time.time() - grad_comp_start
@@ -98,6 +103,20 @@ class SCDOptimizer(Optimizer):
 
     def _loss_kl(self, y, h):
         return torch.log(1 + torch.exp(-y * h))
+
+    def _load_data_in_memory(self, dataset):
+        self._in_memory_dataset = Variable(torch.FloatTensor(dataset.data_table)).cuda()
+
+    def _fetch_col(self, index):
+        if self._load_memory:
+            return self._in_memory_dataset[:, index]
+        else:
+            return Variable(torch.FloatTensor(dataset.fetch_col(i))).cuda()
+
+    def _gpu_memory_sanity_check():
+        if self._load_memory and not self._enable_gpu:
+            warn("######Shouldn't call loading dataset in GPU memory when not enabling GPU,\nAutomatically disable memory loading for safety########")
+            self._load_memory = False
 
 
 class SGDOptimizer(Optimizer):
