@@ -63,7 +63,7 @@ class SCDOptimizer(Optimizer):
                 # compute partial grad first:
                 if self._enable_gpu:
                     gpu_iter_copy_start = time.time()
-                    col = self._fetch_col(i)
+                    col = self._fetch_col(dataset, i)
                     gpu_copy_duration = time.time()-gpu_iter_copy_start+gpu_copy_base_duration
                 else:
                     col = Variable(torch.FloatTensor(dataset.fetch_col(i)))
@@ -109,11 +109,11 @@ class SCDOptimizer(Optimizer):
     def _load_data_in_memory(self, dataset):
         self._in_memory_dataset = Variable(torch.FloatTensor(dataset.data_table)).cuda()
 
-    def _fetch_col(self, index):
+    def _fetch_col(self, dataset, index):
         if self._load_memory:
             return self._in_memory_dataset[:, index]
         else:
-            return Variable(torch.FloatTensor(dataset.fetch_col(i))).cuda()
+            return Variable(torch.FloatTensor(dataset.fetch_col(index))).cuda()
 
     def _gpu_memory_sanity_check(self):
         if self._load_memory and not self._enable_gpu:
