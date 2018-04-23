@@ -17,6 +17,7 @@
 #include "DataManagement.h"
 #include "gradientkl.cu"
 #include "linear_models.h"
+#include "omp.h"
 
 techniques::techniques(){};
 
@@ -48,6 +49,10 @@ void techniques::materialize(string table_T, setting _setting, double *&model, d
     DataManagement DM;
     DM.message("Start materialize");
     
+	// Set Timer
+	clock_t c_start;
+	clock_t c_end;
+
     // Get the table information and column names
     vector<long> tableInfo(3);
     vector<string> fields = DM.getFieldNames(table_T, tableInfo);
@@ -199,6 +204,7 @@ void techniques::materialize(string table_T, setting _setting, double *&model, d
     }
     // Training process, maybe too much judge logic to improve the performance
     do {
+		c_start = clock();
         // Update one coordinate each time
         for(int j = 0; j < feature_num; j ++)
         {
@@ -211,8 +217,11 @@ void techniques::materialize(string table_T, setting _setting, double *&model, d
                 G_lrcache<<<blocksPerGrid, threadsPerBlock>>>(dY, dH, cuda_cache, dmul, cur_index, row_num, pitch);
                 cudaDeviceSynchronize();
                 cudaMemcpy(mul, dmul, sizeof(double)*row_num, cudaMemcpyDeviceToHost);
-                for(long k = 0; k < row_num; k++)
+                // parallel reduction to be added
+				#pragma omp parallel for reduction (+:F_partial)
+				for(long k = 0; k < row_num; k++){
                     F_partial += mul[k];
+				}
                 // printf("F_partial value is %lf\n", F_partial);
             }
             else
@@ -224,15 +233,17 @@ void techniques::materialize(string table_T, setting _setting, double *&model, d
                 G_lrkl<<<blocksPerGrid, threadsPerBlock>>>(dY, dH, dX, dmul, row_num);
                 cudaDeviceSynchronize();
                 cudaMemcpy(mul, dmul, sizeof(double)*row_num, cudaMemcpyDeviceToHost);
-                for(long k = 0; k < row_num; k++)
+                #pragma omp parallel for reduction (+:F_partial)
+				for(long k = 0; k < row_num; k++){
                     F_partial += mul[k];
+				}
             }
             // Store the old W(j)
             double W_j = model[cur_index];
             
             // Update the current coordinate
-            model[cur_index] = model[cur_index] - step_size * F_partial;
-            std::cout << "model[" << cur_index << "]: " << model[cur_index] << std::endl;
+            model[cur_index] = model[cur_index] - step_size * (F_partial/row_num);
+            //std::cout << "model[" << cur_index << "]: " << model[cur_index] << std::endl;
             double diff = model[cur_index] - W_j;
     
             // Update the intermediate variable
@@ -255,19 +266,19 @@ void techniques::materialize(string table_T, setting _setting, double *&model, d
         G_lrloss<<<blocksPerGrid, threadsPerBlock>>>(dY, dH, dmul, row_num);
         cudaDeviceSynchronize();                
         cudaMemcpy(mul, dmul, sizeof(double)*row_num, cudaMemcpyDeviceToHost);
-        for(long k = 0; k < row_num; k++)
+        #pragma omp parallel for reduction (+:F)
+		for(long k = 0; k < row_num; k++)
         {
             F += mul[k];
         }
-        // for(long i = 0; i < row_num ; i ++)
-        // {
-        //     double tmp = lossCompute(Y[i],H[i],lm);
-        //     F += tmp;
-        // }
+      
+		F = F/(double)row_num;
         cout<<"loss: " <<F<<endl;
-		cout<< F << endl;
-        r_curr = F;
+		r_curr = F;
         iters ++;
+		c_end = clock();
+	    cout<<"Iteration "<<iters-1<<" :"<<1000*(c_end-c_start)/CLOCKS_PER_SEC<<"ms\n";
+	
     }
     while(!stop(iters , r_prev, r_curr, _setting));
     
@@ -282,11 +293,13 @@ void techniques::materialize(string table_T, setting _setting, double *&model, d
     }
     
     // Clear the cache
-    if( avail_cache > 0) {
-        // for(int i = 0; i < avail_cache; i ++)
-        // {
-        //     delete [] cache[i];
-        // }
+    if( avail_cache > 0) { 
+		/**
+        for(int i = 0; i < avail_cache; i ++)
+        {
+             delete [] cache[i];
+        }
+		**/
         delete [] cache;
         cudaFree(cuda_cache);
     } 
@@ -577,7 +590,7 @@ void techniques::stream(string table_S, string table_R, setting _setting, double
             double W_j = model[cur_index];
             
             // Update the current coordinate
-            model[cur_index] = model[cur_index] - step_size * F_partial;
+            model[cur_index] = model[cur_index] - step_size * (F_partial/row_num_S);
             
             double diff = model[cur_index] - W_j;
 
@@ -611,7 +624,7 @@ void techniques::stream(string table_S, string table_R, setting _setting, double
         r_curr = F;
         iters ++;
         c_end = clock();
-        cout<<"Iteration:"<<1000*(c_end-c_start)/CLOCKS_PER_SEC<<"ms\n";
+        cout<<"Iteration "<<iters<< ": "<<1000*(c_end-c_start)/CLOCKS_PER_SEC<<"ms\n";
     }
     while(!stop(iters , r_prev, r_curr, _setting));
     
