@@ -43,6 +43,8 @@ class SCDOptimizer(Optimizer):
 
         if self._enable_gpu:
             gpu_copy_base_start = time.time()
+            if self._load_memory:
+                self._load_data_in_memory(dataset)
             y = Variable(torch.FloatTensor(dataset.labels)).cuda()
             h = Variable(torch.FloatTensor(dataset.num_tuples).zero_()).cuda()
             f_cur = Variable(torch.FloatTensor(dataset.num_tuples).zero_()).cuda()
@@ -61,7 +63,7 @@ class SCDOptimizer(Optimizer):
                 # compute partial grad first:
                 if self._enable_gpu:
                     gpu_iter_copy_start = time.time()
-                    col = self.fetch_col(i)
+                    col = self._fetch_col(i)
                     gpu_copy_duration = time.time()-gpu_iter_copy_start+gpu_copy_base_duration
                 else:
                     col = Variable(torch.FloatTensor(dataset.fetch_col(i)))
@@ -113,7 +115,7 @@ class SCDOptimizer(Optimizer):
         else:
             return Variable(torch.FloatTensor(dataset.fetch_col(i))).cuda()
 
-    def _gpu_memory_sanity_check():
+    def _gpu_memory_sanity_check(self):
         if self._load_memory and not self._enable_gpu:
             warn("######Shouldn't call loading dataset in GPU memory when not enabling GPU,\nAutomatically disable memory loading for safety########")
             self._load_memory = False
