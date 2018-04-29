@@ -12,6 +12,18 @@ logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+class LinearSVM(nn.Module):
+    """Support Vector Machine"""
+
+    def __init__(self, input_size, num_classes=1):
+        super(LinearSVM, self).__init__()
+        self.fc = nn.Linear(dim, num_classes)
+
+    def forward(self, x):
+        h = self.fc(x)
+        return h
+
+
 class SCDOpimizer(Optimizer):
     def __init__(self, **args):
         super(SCDOpimizer, self).__init__()
@@ -120,15 +132,55 @@ class SCDOpimizer(Optimizer):
 
 
 class SGDOpimizer(Optimizer):
-    def __init__(self, lr):
+    def __init__(self, **args):
         super(SGDOpimizer, self).__init__()
-        self.lr = lr
+        self.lr = args['lr']
         self.step = 0
 
-    def _build_model(self, dim):
-        self._model = Variable(torch.FloatTensor(dim).zero_())
+        self._enable_gpu = args['enable_gpu']
+        self._max_steps = args['max_steps']
 
-    def minimize(self, dataset):
+        self._C = 0.01
+
+    def _build_model(self, dim):
+        self._model = LinearSVM(input_size=dim)
+
+        if self._enable_gpu:
+            self._model.cuda() 
+
+    def minimize(self, dataset, train_loader):
         self._build_model(dataset.num_features)
-        # shuffle dataset
-        dataset.shuffle()
+        for i, (data, labels) in enumerate(train_loader):
+            iter_start = time.time()
+
+            gpu_copy_start = time.time()
+            if self._enable_gpu:
+                data = Variable(torch.FloatTensor(data)).cuda()
+                labels = Variable(torch.FloatTensor(labels)).cuda()
+            else:
+                data = Variable(torch.FloatTensor(data))
+                labels = Variable(torch.FloatTensor(labels))
+            gpu_copy_duration = time.time() - gpu_copy_start
+            
+            # Forward + Backward + Optimize
+            self._optimizer = torch.optim.SGD(self._model.parameters(), lr=self.lr)
+            self._optimizer.zero_grad()
+
+            fwd_start = time.time()
+            outputs = self._model(data)
+            fwd_dur = time.time() - fwd_start
+
+            loss = torch.mean(torch.clamp(1 - outputs * labels, min=0))  # hinge loss
+            loss += self._C * torch.mean(self._model.fc.weight**2)  # l2 penalty
+
+            bwd_start = time.time()
+            loss.backward()
+            bwd_dur = time.time() - bwd_start
+
+            update_start = time.time()
+            self._optimizer.step()
+            update_dur = time.time() - update_start
+
+            logger_format = "Step: {}, Loss: {:.4f}, Iteration Cost: {:.4f}, GPU Copy: {:.4f}, Forward: {: .4f}, Backward: {: .4f}, Update: {: .4f}"
+            logger.info(logger_format.format(i, loss.data[0], time.time()-iter_start, gpu_copy_duration, 
+                                           fwd_dur, bwd_dur, update_dur))
