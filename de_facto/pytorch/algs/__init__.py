@@ -1,3 +1,3 @@
-from . import logistic_regression, utils
+from . import optim, least_square, linear_svm, logistic_regression, utils
 
-__all__ = ['logistic_regression', 'utils']
+__all__ = ['optim', 'logistic_regression', 'utils', 'least_square', 'linear_svm']

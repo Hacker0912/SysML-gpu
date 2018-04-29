@@ -67,5 +67,5 @@ if __name__ == "__main__":
     print('Training label shape: {}'.format(dataset.num_tuples))
     dataset.shuffle(seed=12)
     print(dataset.data_table)
-    print("---------------------------------------------------")
+    print("-"*80)
     print(dataset.labels)

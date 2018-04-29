@@ -94,10 +94,15 @@ class SCDOpimizer(Optimizer):
             self.step += 1
 
     def _gradient_kl(self, y, col, h):
-        return -y / (1 + torch.exp(h * y)) * col
+        # 0-1 loss
+        sign_loss = torch.sign(y * h - 1)
+        negative_indices = (sign_loss < 0).nonzero().view(-1)
+        if len(negative_indices) != 0:
+            sign_loss.index_fill_(-1, negative_indices, 0)
+        return sign_loss * col
 
     def _loss_kl(self, y, h):
-        return torch.log(1 + torch.exp(-y * h))
+        return torch.max(torch.zeros(y.size()), 1 - y * h)
 
     def _load_data_in_memory(self, dataset):
         self._in_memory_dataset = Variable(torch.FloatTensor(dataset.data_table)).cuda()
