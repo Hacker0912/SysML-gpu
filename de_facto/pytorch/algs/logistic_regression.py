@@ -32,7 +32,6 @@ class SCDOpimizer(Optimizer):
         self._enable_gpu = args['enable_gpu']
         self._max_steps = args['max_steps']
         self._load_memory = args['load_memory']
-        self._gpu_memory_sanity_check()
 
     def _build_model(self, dim):
         if self._enable_gpu:
@@ -43,39 +42,39 @@ class SCDOpimizer(Optimizer):
     def minimize(self, dataset):
         self._build_model(dataset.num_features)
 
+        load_memory_start = time.time()
+        # load the entire dataset into memory
+        if self._load_memory:
+            self._load_data_in_memory(dataset)
+
+        # init variables in CPU/GPU memory
         if self._enable_gpu:
-            gpu_copy_base_start = time.time()
-            if self._load_memory:
-                self._load_data_in_memory(dataset)
             y = Variable(torch.FloatTensor(dataset.labels)).cuda()
             h = Variable(torch.FloatTensor(dataset.num_tuples).zero_()).cuda()
             f_cur = Variable(torch.FloatTensor(dataset.num_tuples).zero_()).cuda()
-            gpu_copy_base_duration = time.time()-gpu_copy_base_start
         else:
             y = Variable(torch.FloatTensor(dataset.labels))
             h = Variable(torch.FloatTensor(dataset.num_tuples).zero_())
             f_cur = Variable(torch.FloatTensor(dataset.num_tuples).zero_())   
-            gpu_copy_base_duration = 0         
-        print("Init GPU copy time: {}".format(gpu_copy_base_duration))
+        load_memory_duration = time.time() - load_memory_start
+
+        print("Init GPU copy time: {}".format(load_memory_duration))
+
         r_prev = 0
         F = 0
 
         # iterative process
         while self.step < self._max_steps:
             iter_start = time.time()
-            gpu_copy_duration = 0
+            memory_move_duration = 0
             reduce_duration = 0
             comp_duration = 0
             for i in range(dataset.num_features):
                 # compute partial grad first:
-                if self._enable_gpu:
-                    tmp_gpu_copy_start = time.time()
-                    col = self._fetch_col(dataset, i)
-                    tmp_gpu_copy_duration = time.time() - tmp_gpu_copy_start
-                    gpu_copy_duration += tmp_gpu_copy_duration
-                else:
-                    col = Variable(torch.FloatTensor(dataset.fetch_col(i)))
-                    gpu_copy_duration = 0
+                tmp_data_fetch_start = time.time()
+                col = self._fetch_col(dataset, i)
+                tmp_data_fetch_duration = time.time() - tmp_data_fetch_start
+                memory_move_duration += tmp_data_fetch_duration
 
                 # count GPU copy time
                 tmp_comp_start = time.time()
@@ -109,15 +108,15 @@ class SCDOpimizer(Optimizer):
                 tmp_gpu_copy_start2 = time.time()
                 _loss_val = F.cpu().data.numpy()[0]
                 tmp_gpu_copy_duration2 = time.time() - tmp_gpu_copy_start2
-                gpu_copy_duration += tmp_gpu_copy_duration2
+                memory_move_duration += tmp_gpu_copy_duration2
             else:
                 _loss_val = F.data.numpy()[0]
-
+            
             tmp_comp_duration2 = time.time() - tmp_comp_start2
             comp_duration += tmp_comp_duration2
 
             logger_format = "Step: {}, Loss: {:.4f}, Iteration Cost: {:.4f}, GPU Copy: {:.4f}, Comp Cost: {:.4f}, Reduce Cost: {:.4f}"
-            print(logger_format.format(self.step, _loss_val, time.time()-iter_start, gpu_copy_duration, comp_duration, reduce_duration))
+            print(logger_format.format(self.step, _loss_val, time.time()-iter_start, memory_move_duration, comp_duration, reduce_duration))
             self.step += 1
 
     def _gradient_kl(self, y, col, h):
@@ -127,13 +126,19 @@ class SCDOpimizer(Optimizer):
         return torch.log(1 + torch.exp(-y * h))
 
     def _load_data_in_memory(self, dataset):
-        self._in_memory_dataset = Variable(torch.FloatTensor(dataset.data_table)).cuda()
+        if self._enable_gpu:
+            self._in_memory_dataset = Variable(torch.FloatTensor(dataset.data_table)).cuda()
+        else:
+            self._in_memory_dataset = Variable(torch.FloatTensor(dataset.data_table))
 
     def _fetch_col(self, dataset, index):
         if self._load_memory:
             return self._in_memory_dataset[:, index]
         else:
-            return Variable(torch.FloatTensor(dataset.fetch_col(index))).cuda()
+            if self._enable_gpu:
+                return Variable(torch.FloatTensor(dataset.fetch_col(index))).cuda()
+            else:
+                return Variable(torch.FloatTensor(dataset.fetch_col(index)))
 
     def _gpu_memory_sanity_check(self):
         if self._load_memory and not self._enable_gpu:
