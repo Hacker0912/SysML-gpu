@@ -15,6 +15,8 @@ parser.add_argument('alg', choices=algs.__all__, #required=True,
 
 parser.add_argument('--data-dir', type=str, default='./data/T_float', 
                     help='directory of place store data')
+parser.add_argument('--num-feats', type=int, default=20, 
+                    help='Number of features in dataset')
 parser.add_argument('--optim', type=str, default='SCD', 
                     help='optimization algorithm used, SCD, SGD are supported')
 parser.add_argument('--lr', type=float, default=0.01, 
@@ -34,7 +36,7 @@ if __name__ == "__main__":
 
     load_data_start = time.time()
     #data = load_data('./data/T_float')
-    data = load_data(args.data_dir)
+    data = load_data(args.data_dir, args.num_feats)
     load_data_dur = time.time() - load_data_start
     print("Data Loading Time: {}".format(load_data_dur))
 

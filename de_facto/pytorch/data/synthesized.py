@@ -8,10 +8,10 @@ logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def load_data(file):
+def load_data(file, num_features):
     labels = np.zeros(_NUM_TUPLES).astype(np.float32)
     # only features contains in raw
-    raw = np.zeros((_NUM_TUPLES, _NUM_FEATS))
+    raw = np.zeros((_NUM_TUPLES, num_features))
     with open(file, 'rb') as f:
         for i,line in enumerate(f.readlines()):
             processed = line.rstrip('\n').split(' ')
