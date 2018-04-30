@@ -14,7 +14,7 @@ parser.add_argument('alg', choices=algs.__all__, #required=True,
                     help='GLM algorithms to use')
 
 parser.add_argument('--data-dir', type=str, default='./data/T_float', 
-                    help='directory of place store data'
+                    help='directory of place store data')
 parser.add_argument('--optim', type=str, default='SCD', 
                     help='optimization algorithm used, SCD, SGD are supported')
 parser.add_argument('--lr', type=float, default=0.01, 

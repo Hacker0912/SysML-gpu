@@ -108,7 +108,7 @@ class SCDOpimizer(Optimizer):
             tmp_reduce_start2 = time.time()
             F = torch.sum(f_cur)
             tmp_reduce_duration2 = time.time() - tmp_reduce_start2
-            reduce_duration += tmp_reduce_start2
+            reduce_duration += tmp_reduce_duration2
 
             if self._enable_gpu:
                 _loss_val = F.cpu().data.numpy()[0]
