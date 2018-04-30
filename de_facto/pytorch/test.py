@@ -1,5 +1,6 @@
 import argparse
 import importlib
+import time
 
 import algs
 
@@ -12,6 +13,8 @@ parser = argparse.ArgumentParser(description='GPU benckmarks')
 parser.add_argument('alg', choices=algs.__all__, #required=True,
                     help='GLM algorithms to use')
 
+parser.add_argument('--data-dir', type=str, default='./data/T_float', 
+                    help='directory of place store data'
 parser.add_argument('--optim', type=str, default='SCD', 
                     help='optimization algorithm used, SCD, SGD are supported')
 parser.add_argument('--lr', type=float, default=0.01, 
@@ -28,9 +31,14 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     alg = importlib.import_module('algs.' + args.alg)
-    data = load_data('./data/T_float')
-    dataset = Dataset(data)
 
+    load_data_start = time.time()
+    #data = load_data('./data/T_float')
+    data = load_data(args.data_dir)
+    load_data_dur = time.time() - load_data_start
+    print("Data Loading Time: {}".format(load_data_dur))
+
+    dataset = Dataset(data)
     if args.optim == 'SCD':
         args = {'lr':args.lr, 
                 'max_steps':args.max_steps,

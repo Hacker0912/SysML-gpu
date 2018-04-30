@@ -56,54 +56,69 @@ class SCDOpimizer(Optimizer):
         else:
             y = Variable(torch.FloatTensor(dataset.labels))
             h = Variable(torch.FloatTensor(dataset.num_tuples).zero_())
-            f_cur = Variable(torch.FloatTensor(dataset.num_tuples).zero_())            
+            f_cur = Variable(torch.FloatTensor(dataset.num_tuples).zero_())   
+            gpu_copy_base_duration = 0         
 
         r_prev = 0
         F = 0
+
         # iterative process
         while self.step < self._max_steps:
             iter_start = time.time()
+            gpu_copy_duration = 0
+            reduce_duration = 0
+            comp_duration = 0
             for i in range(dataset.num_features):
                 # compute partial grad first:
                 if self._enable_gpu:
-                    gpu_iter_copy_start = time.time()
+                    tmp_gpu_copy_start = time.time()
                     col = self._fetch_col(dataset, i)
-                    gpu_copy_duration = time.time()-gpu_iter_copy_start+gpu_copy_base_duration
+                    tmp_gpu_copy_duration = time.time() - tmp_gpu_copy_start
                 else:
                     col = Variable(torch.FloatTensor(dataset.fetch_col(i)))
                     gpu_copy_duration = 0
+                # count GPU copy time
+                gpu_copy_duration += tmp_gpu_copy_duration
 
-                grad_comp_start = time.time()
+                tmp_comp_start = time.time()
                 mul_arr = self._gradient_kl(y, col, h)
-                f_partial = torch.sum(mul_arr)/dataset.num_tuples
-                _prev_model = self._model[i].clone()
-                grad_comp_duration = time.time() - grad_comp_start
 
-                # model partial update
-                model_update_start = time.time() 
+                tmp_reduce_start = time.time()
+                f_partial = torch.sum(mul_arr)/dataset.num_tuples
+                tmp_reduce_duration = time.time() - tmp_reduce_start
+                reduce_duration += tmp_reduce_duration
+
+                _prev_model = self._model[i].clone()
+
+                # model partial update 
                 self._model[i] = self._model[i] - self.lr * f_partial
                 model_diff = self._model[i] - _prev_model
-                model_update_duration = time.time() - model_update_start
                 
-                # back_kl
-                backkl_start = time.time()
-                # print(h)
                 h = h + model_diff * col
-                backkl_duration = time.time() - backkl_start
+                tmp_comp_duration = time.time() - tmp_comp_start
+                comp_duration += tmp_comp_duration
 
-            loss_comp_start = time.time()
+
+            gpu_copy_duration += gpu_copy_base_duration
+
+            tmp_comp_start2 = time.time()
             f_cur = self._loss_kl(y, h)/dataset.num_tuples
-            # print(h)
             r_curr = F
+
+            tmp_reduce_start2 = time.time()
             F = torch.sum(f_cur)
-            loss_comp_duration = time.time() - loss_comp_start
+            tmp_reduce_duration2 = time.time() - tmp_reduce_start2
+            reduce_duration += tmp_reduce_start2
+
             if self._enable_gpu:
                 _loss_val = F.cpu().data.numpy()[0]
             else:
                 _loss_val = F.data.numpy()[0]
-            logger_format = "Step: {}, Loss: {:.4f}, Iteration Cost: {:.4f}, GPU Copy: {:.4f}, Grad Comp: {:.4f}, Model Update: {:.4f}, Backkl: {:.4f}, Loss Comp: {:.4f}"
-            logger.info(logger_format.format(self.step, _loss_val, time.time()-iter_start, gpu_copy_duration, 
-                                            grad_comp_duration, model_update_duration, backkl_duration, loss_comp_duration))
+            tmp_comp_duration2 = time.time() - tmp_comp_start2
+            comp_duration += tmp_comp_duration2
+
+            logger_format = "Step: {}, Loss: {:.4f}, Iteration Cost: {:.4f}, GPU Copy: {:.4f}, Comp Cost: {:.4f}, Reduce Cost: {:.4f}"
+            print(logger_format.format(self.step, _loss_val, time.time()-iter_start, gpu_copy_duration, comp_duration, reduce_duration))
             self.step += 1
 
     def _gradient_kl(self, y, col, h):
