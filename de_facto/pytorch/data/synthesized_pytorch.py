@@ -15,3 +15,7 @@ class SynthesizedDataset(Dataset):
     def __getitem__(self, index):
         data, label = self._data.data_table[index, :], self._data.labels[index]
         return data, label
+
+    @property
+    def num_features(self):
+        return self._data.num_features

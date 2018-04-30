@@ -1,5 +1,6 @@
 import torch
 from torch.autograd import Variable
+from torch import nn
 
 import time
 import copy
@@ -114,7 +115,10 @@ class SCDOpimizer(Optimizer):
         return sign_loss * col
 
     def _loss_kl(self, y, h):
-        return torch.max(torch.zeros(y.size()), 1 - y * h)
+        if self._enable_gpu:
+            return torch.max(Variable(torch.zeros(y.size())).cuda(), 1 - y * h)
+        else:
+            return torch.max(Variable(torch.zeros(y.size())), 1 - y * h)
 
     def _load_data_in_memory(self, dataset):
         self._in_memory_dataset = Variable(torch.FloatTensor(dataset.data_table)).cuda()

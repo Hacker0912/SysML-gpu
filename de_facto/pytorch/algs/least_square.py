@@ -1,5 +1,6 @@
 import torch
 from torch.autograd import Variable
+from torch import nn
 
 import time
 import copy

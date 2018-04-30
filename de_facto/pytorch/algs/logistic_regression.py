@@ -148,8 +148,8 @@ class SGDOpimizer(Optimizer):
 
             gpu_copy_start = time.time()
             if self._enable_gpu:
-                data = Variable(torch.FloatTensor(data)).cuda()
-                labels = Variable(torch.FloatTensor(labels)).cuda()
+                data = Variable(data.float()).cuda()
+                labels = Variable(labels.long()).cuda()
             else:
                 data = Variable(torch.FloatTensor(data))
                 labels = Variable(torch.FloatTensor(labels))

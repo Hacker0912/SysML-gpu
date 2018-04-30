@@ -3,7 +3,9 @@ import importlib
 
 import algs
 
-from data.synthesized import Dataset, SynthesizedDataset, load_data
+import torch
+from data.synthesized import Dataset, load_data
+from data.synthesized_pytorch import SynthesizedDataset
 
 parser = argparse.ArgumentParser(description='GPU benckmarks')
 
@@ -37,7 +39,9 @@ if __name__ == "__main__":
         trainer = alg.SCDOpimizer(**args)
         trainer.minimize(dataset)
     else:
+        batch_size = args.batch_size
+        args = {'lr':args.lr, 'max_steps':args.max_steps,'enable_gpu':args.enable_gpu, 'load_memory':args.load_in_memory}
         dataset = SynthesizedDataset(dataset)
-        train_loader=torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+        train_loader=torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
         trainer = alg.SGDOpimizer(**args)
         trainer.minimize(dataset, train_loader)
