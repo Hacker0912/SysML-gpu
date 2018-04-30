@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     load_data_start = time.time()
     #data = load_data('./data/T_float')
-    data = load_data(args.data_dir, args.num_feats)
+    data = load_data(args.data_dir, args.num_tuples, args.num_feats)
     load_data_dur = time.time() - load_data_start
     print("Data Loading Time: {}".format(load_data_dur))
 
