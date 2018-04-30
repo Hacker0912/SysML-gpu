@@ -73,12 +73,12 @@ class SCDOpimizer(Optimizer):
                     tmp_gpu_copy_start = time.time()
                     col = self._fetch_col(dataset, i)
                     tmp_gpu_copy_duration = time.time() - tmp_gpu_copy_start
+                    gpu_copy_duration += tmp_gpu_copy_duration
                 else:
                     col = Variable(torch.FloatTensor(dataset.fetch_col(i)))
                     gpu_copy_duration = 0
-                # count GPU copy time
-                gpu_copy_duration += tmp_gpu_copy_duration
 
+                # count GPU copy time
                 tmp_comp_start = time.time()
                 mul_arr = self._gradient_kl(y, col, h)
 
@@ -97,9 +97,6 @@ class SCDOpimizer(Optimizer):
                 tmp_comp_duration = time.time() - tmp_comp_start
                 comp_duration += tmp_comp_duration
 
-
-            gpu_copy_duration += gpu_copy_base_duration
-
             tmp_comp_start2 = time.time()
             f_cur = self._loss_kl(y, h)/dataset.num_tuples
             r_curr = F
@@ -110,9 +107,13 @@ class SCDOpimizer(Optimizer):
             reduce_duration += tmp_reduce_duration2
 
             if self._enable_gpu:
+                tmp_gpu_copy_start2 = time.time()
                 _loss_val = F.cpu().data.numpy()[0]
+                tmp_gpu_copy_duration2 = time.time() - tmp_gpu_copy_start2
+                gpu_copy_duration += tmp_gpu_copy_duration2
             else:
                 _loss_val = F.data.numpy()[0]
+            
             tmp_comp_duration2 = time.time() - tmp_comp_start2
             comp_duration += tmp_comp_duration2
 
