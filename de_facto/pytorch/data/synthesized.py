@@ -8,13 +8,13 @@ logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def load_data(file, num_features):
-    labels = np.zeros(_NUM_TUPLES).astype(np.float32)
+def load_data(file, num_tuples, num_features):
+    labels = np.zeros(num_tuples).astype(np.float32)
     # only features contains in raw
-    raw = np.zeros((_NUM_TUPLES, num_features))
+    raw = np.zeros((num_tuples, num_features))
     with open(file, 'rb') as f:
         for i,line in enumerate(f.readlines()):
-            processed = line.rstrip('\n').split(' ')
+            processed = line.rstrip('\n').rstrip(' ').split(' ')
             labels[i] = processed[1]
             try:
                 assert len(raw[i,:]) == len(processed[2:])
@@ -38,7 +38,7 @@ class Dataset(object):
     def shuffle(self, seed=None):
         if seed:
             np.random.seed(seed=seed)
-        shuffled_indices = np.arange(_NUM_TUPLES)
+        shuffled_indices = np.arange(self._m)
         np.random.shuffle(shuffled_indices)
         self._training_data = np.take(self._training_data, shuffled_indices, axis=0)
         self._training_labels = np.take(self._training_labels, shuffled_indices)

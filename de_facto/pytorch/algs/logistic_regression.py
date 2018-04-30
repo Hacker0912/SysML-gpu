@@ -56,7 +56,7 @@ class SCDOpimizer(Optimizer):
             h = Variable(torch.FloatTensor(dataset.num_tuples).zero_())
             f_cur = Variable(torch.FloatTensor(dataset.num_tuples).zero_())   
             gpu_copy_base_duration = 0         
-
+        print("Init GPU copy time: {}".format(gpu_copy_base_duration))
         r_prev = 0
         F = 0
 
@@ -112,7 +112,7 @@ class SCDOpimizer(Optimizer):
                 gpu_copy_duration += tmp_gpu_copy_duration2
             else:
                 _loss_val = F.data.numpy()[0]
-            
+
             tmp_comp_duration2 = time.time() - tmp_comp_start2
             comp_duration += tmp_comp_duration2
 

@@ -15,6 +15,8 @@ parser.add_argument('alg', choices=algs.__all__, #required=True,
 
 parser.add_argument('--data-dir', type=str, default='./data/T_float', 
                     help='directory of place store data')
+parser.add_argument('--num-tuples', type=int, default=10000000, 
+                    help='Number of features in dataset')
 parser.add_argument('--num-feats', type=int, default=20, 
                     help='Number of features in dataset')
 parser.add_argument('--optim', type=str, default='SCD', 
