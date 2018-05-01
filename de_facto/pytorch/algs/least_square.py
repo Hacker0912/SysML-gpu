@@ -59,7 +59,7 @@ class SCDOpimizer(Optimizer):
             f_cur = Variable(torch.FloatTensor(dataset.num_tuples).zero_())   
         load_memory_duration = time.time() - load_memory_start
 
-        print("Init GPU copy time: {}".format(load_memory_duration))
+        print("Init Memory Movement time: {}".format(load_memory_duration))
 
         r_prev = 0
         F = 0
@@ -116,7 +116,7 @@ class SCDOpimizer(Optimizer):
             tmp_comp_duration2 = time.time() - tmp_comp_start2
             comp_duration += tmp_comp_duration2
 
-            logger_format = "Step: {}, Loss: {:.4f}, Iteration Cost: {:.4f}, GPU Copy: {:.4f}, Comp Cost: {:.4f}, Reduce Cost: {:.4f}"
+            logger_format = "Step: {}, Loss: {:.4f}, Iteration Cost: {:.4f}, Memory Move: {:.4f}, Comp Cost: {:.4f}, Reduce Cost: {:.4f}"
             print(logger_format.format(self.step, _loss_val, time.time()-iter_start, memory_move_duration, comp_duration, reduce_duration))
             self.step += 1
 
